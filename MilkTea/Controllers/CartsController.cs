@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MilkTea.Entities;
 
 namespace MilkTea.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class CartsController : ControllerBase
@@ -30,7 +28,7 @@ namespace MilkTea.Controllers
             foreach (var cart in carts)
             {
                 _context.Entry(cart).Collection(c => c.DishCarts).Load();
-                if (cart.DishCarts != null)
+                if (cart.DishCarts.Count != 0)
                 {
                     foreach (var dish in cart.DishCarts)
                     {
@@ -51,7 +49,7 @@ namespace MilkTea.Controllers
             if (cart != null)
             {
                 _context.Entry(cart).Collection(c => c.DishCarts).Load();
-                if (cart.DishCarts != null)
+                if (cart.DishCarts.Count != 0)
                 {
                     foreach (var dish in cart.DishCarts)
                     {
@@ -62,9 +60,8 @@ namespace MilkTea.Controllers
                 }
                 return cart;
             }
-            return NotFound("Cart does not exist");
+            return NotFound();
         }
-
 
         // PUT: api/Carts/5
         [HttpPut("{id}")]
@@ -76,7 +73,6 @@ namespace MilkTea.Controllers
             }
             var cartExist = _context.Carts.Find(cart.CartId);
             _context.Entry(cartExist).State = EntityState.Modified;
-            var dish = cart.DishCarts.Where(d => d.DishId == cart.DishCarts.First().DishId).First();
             
             try
             {
@@ -97,26 +93,21 @@ namespace MilkTea.Controllers
             return NoContent();
         }
 
-        //Thêm món mới vào giỏ hàng
         // POST: api/Carts
         [HttpPost]
         public async Task<ActionResult<Cart>> PostCart(Cart cart)
         {
-            //Neu them mot mon moi vao gio hang
             if (cart.DishCarts.Count > 0)
             {
                 var dish = cart.DishCarts.First();
                 var cartExist = _context.Carts.Find(cart.CartId);
-                //Neu gio hang da ton tai
                 if (cartExist != null)
                 {
                     cartExist.DishCarts.Add(dish);
-                    //_context.Entry(cartExist).Property(c => c.DishCarts).CurrentValue.Add(dish);
                     CalculateDishCart(dish);
                     CalculateCart(cartExist);
                     cart = cartExist;
                 }
-                //Neu gio hang chua ton tai
                 else
                 {
                     _context.Carts.Add(cart);
@@ -145,17 +136,24 @@ namespace MilkTea.Controllers
 
         // DELETE: api/Carts/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCart(int id)
+        public IActionResult DeleteCart(int id)
         {
-            var cart = await _context.Carts.FindAsync(id);
+            var cart = _context.Carts.Find(id);
             if (cart == null)
             {
                 return NotFound();
             }
 
-            _context.Carts.Remove(cart);
-            await _context.SaveChangesAsync();
-
+            _context.Entry(cart).Collection(c => c.DishCarts).Load();
+            if (cart.DishCarts.Count != 0)
+            {
+                foreach (var dish in cart.DishCarts)
+                {
+                    _context.DishCarts.Remove(dish);
+                }
+                cart.TotolPrice = 0;
+                _context.SaveChanges();
+            }
             return NoContent();
         }
 

@@ -16,7 +16,7 @@ namespace MilkTea.Entities
         }
         public enum Ice
         {
-            Ice20,      //0
+            Ice25,      //0
             Ice50,      //1
             Ice75,      //2
             Ice100      //3 default

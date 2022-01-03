@@ -21,6 +21,9 @@ namespace MilkTea.Entities
         public DbSet<Receive> Receives { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<Cart> Carts { get; set; }
-        public DbSet<MilkTea.Entities.DishCart> DishCart { get; set; }
+        public DbSet<DishCart> DishCarts { get; set; }
+        public DbSet<DishOrder> DishOrders { get; set; }
+        public DbSet<Admin> Admins { get; set; }
+        public DbSet<Transaction> Transactions { get; set; }
     }
 }

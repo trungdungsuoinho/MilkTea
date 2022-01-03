@@ -16,8 +16,32 @@ namespace MilkTea.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("Relational:MaxIdentifierLength", 128)
-                .HasAnnotation("ProductVersion", "5.0.11")
+                .HasAnnotation("ProductVersion", "5.0.12")
                 .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+            modelBuilder.Entity("MilkTea.Entities.Admin", b =>
+                {
+                    b.Property<int>("AdminId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<string>("FullName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("AdminId");
+
+                    b.ToTable("Admins");
+                });
 
             modelBuilder.Entity("MilkTea.Entities.Cart", b =>
                 {
@@ -41,6 +65,9 @@ namespace MilkTea.Migrations
 
                     b.Property<string>("CategoryName")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("Enable")
+                        .HasColumnType("bit");
 
                     b.HasKey("CategoryId");
 
@@ -102,11 +129,11 @@ namespace MilkTea.Migrations
                     b.Property<DateTime?>("DeliveryDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Note")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("OrderDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("OrderNote")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ReceiveDate")
                         .HasColumnType("datetime2");
@@ -145,14 +172,24 @@ namespace MilkTea.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("Enable")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Image")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Inventory")
+                        .HasColumnType("int");
 
                     b.Property<int>("Price")
                         .HasColumnType("int");
 
                     b.Property<string>("ProductName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("View")
+                        .HasColumnType("int");
 
                     b.HasKey("ProductId");
 
@@ -168,24 +205,28 @@ namespace MilkTea.Migrations
                         .HasColumnType("int")
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<string>("ReceiveAddress")
+                    b.Property<string>("Address")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ReceiveName")
+                    b.Property<string>("District")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ReceiveNote")
+                    b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ReceivePhone")
+                    b.Property<string>("Note")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
+                    b.Property<string>("Phone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Region")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Ward")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ReceiveId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Receives");
                 });
@@ -222,6 +263,31 @@ namespace MilkTea.Migrations
                     b.ToTable("Toppings");
                 });
 
+            modelBuilder.Entity("MilkTea.Entities.Transaction", b =>
+                {
+                    b.Property<int>("TransactionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Apptransid")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Timestamp")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Zptransid")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("TransactionId");
+
+                    b.ToTable("Transactions");
+                });
+
             modelBuilder.Entity("MilkTea.Entities.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -239,15 +305,25 @@ namespace MilkTea.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("Password")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ReceiveId")
+                        .HasColumnType("int");
 
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<bool>("VerifyEmail")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("VerifyPhone")
+                        .HasColumnType("bit");
+
                     b.HasKey("UserId");
+
+                    b.HasIndex("ReceiveId");
 
                     b.ToTable("Users");
                 });
@@ -313,7 +389,7 @@ namespace MilkTea.Migrations
             modelBuilder.Entity("MilkTea.Entities.Order", b =>
                 {
                     b.HasOne("MilkTea.Entities.Receive", "Receive")
-                        .WithMany("Orders")
+                        .WithMany()
                         .HasForeignKey("ReceiveId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -340,15 +416,24 @@ namespace MilkTea.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("MilkTea.Entities.Receive", b =>
+            modelBuilder.Entity("MilkTea.Entities.Transaction", b =>
                 {
-                    b.HasOne("MilkTea.Entities.User", "User")
+                    b.HasOne("MilkTea.Entities.Order", "Order")
                         .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("TransactionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("User");
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("MilkTea.Entities.User", b =>
+                {
+                    b.HasOne("MilkTea.Entities.Receive", "Receive")
+                        .WithMany()
+                        .HasForeignKey("ReceiveId");
+
+                    b.Navigation("Receive");
                 });
 
             modelBuilder.Entity("MilkTea.Entities.DishCart", b =>
@@ -391,11 +476,6 @@ namespace MilkTea.Migrations
             modelBuilder.Entity("MilkTea.Entities.Product", b =>
                 {
                     b.Navigation("Dishs");
-                });
-
-            modelBuilder.Entity("MilkTea.Entities.Receive", b =>
-                {
-                    b.Navigation("Orders");
                 });
 
             modelBuilder.Entity("MilkTea.Entities.Size", b =>

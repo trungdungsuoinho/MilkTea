@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using MilkTea.Entities;
+using ZaloPayDemo.ZaloPay;
+using ZaloPayDemo.ZaloPay.Models;
 
 namespace MilkTea.Controllers
 {
@@ -14,13 +16,14 @@ namespace MilkTea.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly MilkTeaContext _context;
+        private readonly IConfiguration Configuration;
 
-        public OrdersController(MilkTeaContext context)
+        public OrdersController(MilkTeaContext context, IConfiguration configuration)
         {
             _context = context;
+            Configuration = configuration;
         }
 
-        //DONE
         // GET: api/Orders
         [HttpGet]
         public ActionResult<IEnumerable<Order>> GetOrders()
@@ -28,7 +31,6 @@ namespace MilkTea.Controllers
             var orders = _context.Orders.ToList();
             foreach(var order in orders)
             {
-                _context.Entry(order).Reference(p => p.User).Load();
                 _context.Entry(order).Reference(p => p.Receive).Load();
                 _context.Entry(order).Collection(o => o.DishOrders).Load();
                 foreach (var dish in order.DishOrders)
@@ -44,7 +46,6 @@ namespace MilkTea.Controllers
             return orders;
         }
 
-        //DONE
         // GET: api/Orders/{orderId}
         [HttpGet("{id}")]
         public ActionResult<Order> GetOrder(int id)
@@ -54,7 +55,6 @@ namespace MilkTea.Controllers
             {
                 return NotFound();
             }
-            _context.Entry(order).Reference(p => p.User).Load();
             _context.Entry(order).Reference(p => p.Receive).Load();
             _context.Entry(order).Collection(o => o.DishOrders).Load();
             foreach (var dish in order.DishOrders)
@@ -96,14 +96,59 @@ namespace MilkTea.Controllers
             return NoContent();
         }
 
-        //DONE
         // POST: api/Orders
         [HttpPost]
         public ActionResult<Order> PostOrder(Order order)
         {
+            var cart = _context.Carts.Find(order.UserId);
+            if (cart == null)
+            {
+                return BadRequest();
+            }
+            _context.Entry(cart).Collection(c => c.DishCarts).Load();
+            if (cart.DishCarts.Count == 0)
+            {
+                return BadRequest();
+            }
+
+            //Lưu Receive trước để tạo key cho Receive
+            _context.Receives.Add(order.Receive);
+            _context.SaveChanges();
+
+            //Lưu Order để tạo key cho Order
             _context.Orders.Add(order);
             order.OrderDate = DateTime.Now;
-            _context.Entry(order).Reference(p => p.Receive).Load();
+            _context.SaveChanges();
+
+            //Chép danh sách Dish từ Cart vào Order
+            foreach (var dish in cart.DishCarts)
+            {
+                var dishOrder = new DishOrder();
+                dishOrder.OrderId = order.OrderId;
+                dishOrder.ProductId = dish.ProductId;
+                dishOrder.Quantily = dish.Quantily;
+                dishOrder.SizeName = dish.SizeName;
+                dishOrder.Ice = dish.Ice;
+                dishOrder.Sugar = dish.Sugar;
+                dishOrder.ToppingId = dish.ToppingId;
+                dishOrder.DishPrice = dish.DishPrice;
+                _context.DishOrders.Add(dishOrder);
+            }
+            order.TotolPrice = cart.TotolPrice + order.ShipPrice;
+
+            //Làm sạch giỏ hàng
+            if (cart.DishCarts.Count != 0)
+            {
+                foreach (var dish in cart.DishCarts)
+                {
+                    _context.DishCarts.Remove(dish);
+                }
+                cart.TotolPrice = 0;
+                _context.SaveChanges();
+            }
+            _context.SaveChanges();
+
+            _context.Entry(order).Collection(o => o.DishOrders).Load();
             foreach (var dish in order.DishOrders)
             {
                 _context.Entry(dish).Reference(p => p.Product).Load();
@@ -111,16 +156,87 @@ namespace MilkTea.Controllers
                 if (dish.ToppingId != null)
                 {
                     _context.Entry(dish).Reference(p => p.Topping).Load();
-                    dish.DishPrice = (dish.Product.Price + dish.Topping.Price) * dish.Quantily;
-                }
-                else
-                {
-                    dish.DishPrice = dish.Product.Price * dish.Quantily;
                 }
             }
-            order.TotolPrice = (from d in order.DishOrders select d.DishPrice).Sum() + order.ShipPrice;
-            _context.SaveChanges();
             return CreatedAtAction("GetOrder", new { id = order.OrderId }, order);
+        }
+
+        // POST: api/Orders/Online
+        [HttpPost("Online")]
+        public async Task<ActionResult> PostOrderOnline(Order order)
+        {
+            var cart = _context.Carts.Find(order.UserId);
+            if (cart == null)
+            {
+                return BadRequest();
+            }
+            _context.Entry(cart).Collection(c => c.DishCarts).Load();
+            if (cart.DishCarts.Count == 0)
+            {
+                return BadRequest();
+            }
+
+            //Lưu Receive trước để tạo key cho Receive
+            _context.Receives.Add(order.Receive);
+            _context.SaveChanges();
+
+            //Lưu Order để tạo key cho Order
+            _context.Orders.Add(order);
+            order.OrderDate = DateTime.Now;
+            _context.SaveChanges();
+
+            //Chép danh sách Dish từ Cart vào Order
+            foreach (var dish in cart.DishCarts)
+            {
+                var dishOrder = new DishOrder();
+                dishOrder.OrderId = order.OrderId;
+                dishOrder.ProductId = dish.ProductId;
+                dishOrder.Quantily = dish.Quantily;
+                dishOrder.SizeName = dish.SizeName;
+                dishOrder.Ice = dish.Ice;
+                dishOrder.Sugar = dish.Sugar;
+                dishOrder.ToppingId = dish.ToppingId;
+                dishOrder.DishPrice = dish.DishPrice;
+                _context.DishOrders.Add(dishOrder);
+            }
+            order.TotolPrice = cart.TotolPrice + order.ShipPrice;
+
+            var payOrderData = new OrderData(Configuration, order.UserId.ToString(), order.TotolPrice);
+            var payOrder = await ZaloPayHelper.CreateOrder(Configuration, payOrderData);
+
+            if (Convert.ToInt32(payOrder["returncode"]) == 1)
+            {
+                _context.Transactions.Add(new Transaction
+                {
+                    TransactionId = order.OrderId,
+                    Apptransid = payOrderData.Apptransid,
+                    Timestamp = payOrderData.Apptime,
+                    Status = 0
+                });
+
+                //Làm sạch giỏ hàng
+                if (cart.DishCarts.Count != 0)
+                {
+                    foreach (var dish in cart.DishCarts)
+                    {
+                        _context.DishCarts.Remove(dish);
+                    }
+                    cart.TotolPrice = 0;
+                }
+                _context.SaveChanges();
+            
+                var orderurl = payOrder["orderurl"].ToString();
+                var QRCodeBase64Image = QRCodeHelper.CreateQRCodeBase64Image(orderurl);
+                var apptransid = payOrderData.Apptransid;
+                return Ok(new { orderurl, QRCodeBase64Image, apptransid });
+            }
+            else
+            {
+                _context.Orders.Remove(order);
+                _context.Receives.Remove(order.Receive);
+                _context.SaveChanges();
+                return BadRequest();
+            }
         }
 
         // DELETE: api/Orders/5

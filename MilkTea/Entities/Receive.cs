@@ -9,14 +9,12 @@ namespace MilkTea.Entities
     public class Receive
     {
         public int ReceiveId { get; set; }
-        public int UserId { get; set; }
-        [JsonIgnore]
-        public User User { get; set; }
-        public string ReceiveName { get; set; }
-        public string ReceivePhone { get; set; }
-        public string ReceiveAddress { get; set; }
-        public string ReceiveNote { get; set; }
-        [JsonIgnore]
-        public ICollection<Order> Orders { get; set; }
+        public string Name { get; set; }
+        public string Phone { get; set; }
+        public string Address { get; set; }
+        public string Ward { get; set; }
+        public string District { get; set; }
+        public string Region { get; set; }
+        public string Note { get; set; }
     }
 }
