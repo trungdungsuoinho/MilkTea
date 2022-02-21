@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MilkTea.Entities;
 
 namespace MilkTea.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class DishCartsController : ControllerBase
@@ -26,14 +24,14 @@ namespace MilkTea.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<DishCart>>> GetDishCart()
         {
-            return await _context.DishCart.ToListAsync();
+            return await _context.DishCarts.ToListAsync();
         }
 
         // GET: api/DishCarts/5
         [HttpGet("{id}")]
         public async Task<ActionResult<DishCart>> GetDishCart(int id)
         {
-            var dishCart = await _context.DishCart.FindAsync(id);
+            var dishCart = await _context.DishCarts.FindAsync(id);
 
             if (dishCart == null)
             {
@@ -43,12 +41,12 @@ namespace MilkTea.Controllers
             return dishCart;
         }
 
-        //Sua mon trong gio hang
+        //Edit Dish in Cart
         // PUT: api/DishCarts/{dishId}
         [HttpPut("{id}")]
         public ActionResult<Cart> PutDishCart(int id, DishCart dishCart)
         {
-            if (id != dishCart.DishId || !_context.DishCart.Any(e => e.DishId == id && e.CartId == dishCart.CartId))
+            if (id != dishCart.DishId || !_context.DishCarts.Any(e => e.DishId == id && e.CartId == dishCart.CartId))
             {
                 return BadRequest();
             }
@@ -65,11 +63,12 @@ namespace MilkTea.Controllers
             return BadRequest();
         }
 
-        //Them mon moi vao gio hang
+        //Add new Dish into Cart
         // POST: api/DishCarts
         [HttpPost]
         public ActionResult<Cart> PostDishCart(DishCart dishCart)
         {
+            //Create a new Cart if it doesn't already exist 
             var cart = _context.Carts.Find(dishCart.CartId);
             if (cart == null)
             {
@@ -77,41 +76,60 @@ namespace MilkTea.Controllers
                 _context.Carts.Add(cart);
                 _context.SaveChanges();
             }
-            _context.DishCart.Add(dishCart);
+            //Add Dish and calculate DishPrice
+            _context.DishCarts.Add(dishCart);
             CalculateDishCart(dishCart);
             _context.SaveChanges();
-            _context.Entry(cart).Collection(c => c.DishCarts);
-            foreach (var dish in cart.DishCarts)
+
+            _context.Entry(cart).Collection(c => c.DishCarts).Load();
+            if (cart.DishCarts.Count != 0)
             {
-                _context.Entry(dish).Reference(d => d.Product);
+                CalculateCart(cart);
+                _context.SaveChanges();
+                foreach (var dish in cart.DishCarts)
+                {
+                    _context.Entry(dish).Reference(d => d.Product).Load();
+                }
             }
-            CalculateCart(cart);
-            _context.SaveChanges();
             return CreatedAtAction("GetDishCart", new { id = cart.CartId }, cart);
         }
 
-        //Xoa mon khoi gio hang
+        //Remove Dish from Cart
         // DELETE: api/DishCarts/{dishId}
         [HttpDelete("{id}")]
         public ActionResult<Cart> DeleteDishCart(int id)
         {
-            var dishCart = _context.DishCart.Find(id);
+            var dishCart = _context.DishCarts.Find(id);
             if (dishCart == null)
             {
                 return NotFound();
             }
-            _context.DishCart.Remove(dishCart);
+            _context.DishCarts.Remove(dishCart);
             var cart = _context.Carts.Find(dishCart.CartId);
             _context.SaveChanges();
+
             _context.Entry(cart).Collection(c => c.DishCarts).Load();
-            CalculateCart(cart);
-            _context.SaveChanges();
+            if (cart.DishCarts.Count != 0)
+            {
+                CalculateCart(cart);
+                _context.SaveChanges();
+                foreach (var dish in cart.DishCarts)
+                {
+                    if (dish.ToppingId != null)
+                    {
+                        _context.Entry(dish).Reference(d => d.Topping).Load();
+                        dish.DishPrice = dish.Topping.Price;
+                    }
+                    _context.Entry(dish).Reference(d => d.Product).Load();
+                    _context.Entry(dish).Reference(d => d.Size).Load();
+                }
+            }
             return CreatedAtAction("GetDishCart", new { id = cart.CartId }, cart);
         }
 
         private bool DishCartExists(int id)
         {
-            return _context.DishCart.Any(e => e.DishId == id);
+            return _context.DishCarts.Any(e => e.DishId == id);
         }
 
         private void CalculateDishCart(DishCart dishCart)

@@ -24,12 +24,35 @@ namespace MilkTea.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
         {
+            return (from c in await _context.Categories.ToListAsync()
+                   where c.Enable == true
+                   select c).ToList();
+        }
+
+        // GET: api/Categories/Full
+        [HttpGet("full")]
+        public async Task<ActionResult<IEnumerable<Category>>> GetFullCategories()
+        {
             return await _context.Categories.ToListAsync();
         }
 
         // GET: api/Categories/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Category>> GetCategory(int id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+
+            if (category == null || category.Enable == false)
+            {
+                return NotFound();
+            }
+
+            return category;
+        }
+
+        // GET: api/Categories/All/5
+        [HttpGet("full/{id}")]
+        public async Task<ActionResult<Category>> GetFullCategory(int id)
         {
             var category = await _context.Categories.FindAsync(id);
 
@@ -42,7 +65,6 @@ namespace MilkTea.Controllers
         }
 
         // PUT: api/Categories/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCategory(int id, Category category)
         {
@@ -52,7 +74,14 @@ namespace MilkTea.Controllers
             }
 
             _context.Entry(category).State = EntityState.Modified;
-
+            if (_context.Entry(category).GetDatabaseValues().GetValue<bool>("Enable") == true && category.Enable == false)
+            {
+                _context.Entry(category).Collection(c => c.Products).Load();
+                foreach (var product in category.Products)
+                {
+                    product.Enable = false;
+                }
+            }
             try
             {
                 await _context.SaveChangesAsync();
@@ -73,10 +102,10 @@ namespace MilkTea.Controllers
         }
 
         // POST: api/Categories
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<Category>> PostCategory(Category category)
         {
+            category.Enable = true;
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
 

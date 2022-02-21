@@ -25,12 +25,36 @@ namespace MilkTea.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
+            return (from c in await _context.Products.ToListAsync()
+                    where c.Enable == true
+                    select c).ToList();
+        }
+
+        // GET: api/Products/Full
+        [HttpGet("full")]
+        public async Task<ActionResult<IEnumerable<Product>>> GetFullProducts()
+        {
             return await _context.Products.ToListAsync();
         }
 
         // GET: api/Products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+
+            if (product == null || product.Enable == false)
+            {
+                return NotFound();
+            }
+            product.View++;
+            _context.SaveChanges();
+            return product;
+        }
+
+        // GET: api/Products/Full/5
+        [HttpGet("full/{id}")]
+        public async Task<ActionResult<Product>> GetFullProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
 
@@ -43,7 +67,6 @@ namespace MilkTea.Controllers
         }
 
         // PUT: api/Products/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutProduct(int id, Product product)
         {
@@ -51,7 +74,10 @@ namespace MilkTea.Controllers
             {
                 return BadRequest();
             }
-
+            if (_context.Categories.Find(product.CategoryId).Enable == false && product.Enable == true)
+            {
+                return BadRequest();
+            }
             _context.Entry(product).State = EntityState.Modified;
 
             try
@@ -74,12 +100,13 @@ namespace MilkTea.Controllers
         }
 
         // POST: api/Products
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Product>> PostProduct(Product product)
+        public ActionResult<Product> PostProduct(Product product)
         {
             _context.Products.Add(product);
-            await _context.SaveChangesAsync();
+            product.View = 0;
+            product.Enable = _context.Categories.Find(product.CategoryId).Enable;
+            _context.SaveChanges();
 
             return CreatedAtAction("GetProduct", new { id = product.ProductId }, product);
         }
